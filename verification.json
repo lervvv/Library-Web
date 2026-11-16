@@ -1,0 +1,104 @@
+{
+  "environment": {
+    "node": "v20.20.1",
+    "python_sqlite": "3.46.1"
+  },
+  "javascript_syntax": [
+    {
+      "file": "public/app.js",
+      "passed": true,
+      "error": ""
+    },
+    {
+      "file": "server/index.js",
+      "passed": true,
+      "error": ""
+    },
+    {
+      "file": "server/create-admin.js",
+      "passed": true,
+      "error": ""
+    },
+    {
+      "file": "server/service.js",
+      "passed": true,
+      "error": ""
+    },
+    {
+      "file": "server/security.js",
+      "passed": true,
+      "error": ""
+    },
+    {
+      "file": "server/api.js",
+      "passed": true,
+      "error": ""
+    },
+    {
+      "file": "server/passwords.js",
+      "passed": true,
+      "error": ""
+    },
+    {
+      "file": "server/db.js",
+      "passed": true,
+      "error": ""
+    },
+    {
+      "file": "server/domain.js",
+      "passed": true,
+      "error": ""
+    },
+    {
+      "file": "tests/http.test.js",
+      "passed": true,
+      "error": ""
+    },
+    {
+      "file": "tests/service.test.js",
+      "passed": true,
+      "error": ""
+    },
+    {
+      "file": "tests/domain.test.js",
+      "passed": true,
+      "error": ""
+    }
+  ],
+  "node_tests": {
+    "exit_code": 0,
+    "passed": 15,
+    "failed": 0,
+    "skipped": 2,
+    "note": "SQLite service and HTTP integration suites require Node >=22.13 and were not executed in this environment."
+  },
+  "sql_schema_checks": [
+    {
+      "test": "duplicate active loan",
+      "passed": true
+    },
+    {
+      "test": "foreign-key history",
+      "passed": true
+    },
+    {
+      "test": "negative pages",
+      "passed": true
+    },
+    {
+      "test": "invalid status",
+      "passed": true
+    }
+  ],
+  "not_verified": [
+    "Real browser UI behavior",
+    "Node built-in SQLite runtime integration",
+    "Open Library live availability",
+    "Public HTTPS deployment"
+  ],
+  "scope": {
+    "original_source_files_indexed": 52,
+    "remote_git_repository_created": false,
+    "legacy_mysql_data_imported": false
+  }
+}

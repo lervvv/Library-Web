@@ -1,0 +1,17 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {age,overdue,addDays,date,int,str,validateReader,validateEligibility,policies} from '../server/domain.js';
+import {hashPassword,verifyPassword} from '../server/passwords.js';
+test('Возраст учитывает наступление дня рождения',()=>{assert.equal(age('2010-11-17','2026-11-16'),15);assert.equal(age('2010-11-16','2026-11-16'),16);});
+test('Просрочка не бывает отрицательной',()=>{assert.equal(overdue('2026-11-20','2026-11-16'),0);assert.equal(overdue('2026-11-10','2026-11-16'),6);});
+test('Переход месяца и високосный год',()=>{assert.equal(addDays('2024-02-28',2),'2024-03-01');assert.equal(addDays('2026-12-31',1),'2027-01-01');});
+test('Отбрасывает невозможные даты',()=>{for(const d of ['2026-02-30','not a date','2026-13-01','2026-2-01'])assert.throws(()=>date(d));});
+test('Строгая проверка чисел',()=>{for(const n of ['3',NaN,Infinity,1.5,-1])assert.throws(()=>int(n,'test'));assert.equal(int(1,'test'),1);});
+test('Строки: trim, обязательность, лимит',()=>{assert.equal(str(' abc ','test'), 'abc');assert.throws(()=>str(' ','test'));assert.throws(()=>str('abcd','test',3));});
+const reader={email:' READER@EXAMPLE.COM ',name:'Иван',surname:'Иванов',birth_date:'2000-01-01',phone:'+375 (29) 123-45-67'};
+test('Нормализация телефона и email',()=>{const r=validateReader(reader);assert.equal(r.phone,'+375291234567');assert.equal(r.email,'reader@example.com');});
+test('Неверные контактные данные запрещены',()=>{assert.throws(()=>validateReader({...reader,phone:'123'}));assert.throws(()=>validateReader({...reader,email:'no'}));assert.throws(()=>validateReader({...reader,birth_date:'2999-01-01'}));});
+for(const [category,p]of Object.entries(policies))test(`Лимит ${category}: ${p.limit}`,()=>{const r={active:1,role:'reader',birth_date:'1990-01-01',category};validateEligibility(r,{age_limit:0},p.limit-1);assert.throws(()=>validateEligibility(r,{age_limit:0},p.limit));});
+test('Неактивный читатель и сотрудник не могут получать книги',()=>{for(const r of [{active:0,role:'reader'},{active:1,role:'admin'}])assert.throws(()=>validateEligibility(r,{age_limit:0},0));});
+test('Возрастные ограничения проверяются',()=>{assert.throws(()=>validateEligibility({active:1,role:'reader',birth_date:'2020-01-01',category:'Schoolboy'},{age_limit:18},0));});
+test('Пароль хранится как salted scrypt, проверка не зависит от plaintext',async()=>{const a=await hashPassword('Correct-pass-123');const b=await hashPassword('Correct-pass-123');assert.notEqual(a,b);assert.ok(!a.includes('Correct'));assert.equal(await verifyPassword('Correct-pass-123',a),true);assert.equal(await verifyPassword('Wrong-pass-123',a),false);await assert.rejects(hashPassword('short'));});

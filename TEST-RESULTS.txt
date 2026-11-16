@@ -1,0 +1,118 @@
+> library-web@1.0.0 test
+> node --test tests/*.test.js
+
+TAP version 13
+# Subtest: Возраст учитывает наступление дня рождения
+ok 1 - Возраст учитывает наступление дня рождения
+  ---
+  duration_ms: 1.073447
+  ...
+# Subtest: Просрочка не бывает отрицательной
+ok 2 - Просрочка не бывает отрицательной
+  ---
+  duration_ms: 0.163344
+  ...
+# Subtest: Переход месяца и високосный год
+ok 3 - Переход месяца и високосный год
+  ---
+  duration_ms: 0.354406
+  ...
+# Subtest: Отбрасывает невозможные даты
+ok 4 - Отбрасывает невозможные даты
+  ---
+  duration_ms: 0.410168
+  ...
+# Subtest: Строгая проверка чисел
+ok 5 - Строгая проверка чисел
+  ---
+  duration_ms: 0.209235
+  ...
+# Subtest: Строки: trim, обязательность, лимит
+ok 6 - Строки: trim, обязательность, лимит
+  ---
+  duration_ms: 0.171631
+  ...
+# Subtest: Нормализация телефона и email
+ok 7 - Нормализация телефона и email
+  ---
+  duration_ms: 0.355927
+  ...
+# Subtest: Неверные контактные данные запрещены
+ok 8 - Неверные контактные данные запрещены
+  ---
+  duration_ms: 0.322592
+  ...
+# Subtest: Лимит Schoolboy: 3
+ok 9 - Лимит Schoolboy: 3
+  ---
+  duration_ms: 0.237025
+  ...
+# Subtest: Лимит Student: 5
+ok 10 - Лимит Student: 5
+  ---
+  duration_ms: 0.192507
+  ...
+# Subtest: Лимит Pensioner: 5
+ok 11 - Лимит Pensioner: 5
+  ---
+  duration_ms: 0.145973
+  ...
+# Subtest: Лимит Adult: 7
+ok 12 - Лимит Adult: 7
+  ---
+  duration_ms: 0.104449
+  ...
+# Subtest: Неактивный читатель и сотрудник не могут получать книги
+ok 13 - Неактивный читатель и сотрудник не могут получать книги
+  ---
+  duration_ms: 0.215038
+  ...
+# Subtest: Возрастные ограничения проверяются
+ok 14 - Возрастные ограничения проверяются
+  ---
+  duration_ms: 0.18028
+  ...
+# Subtest: Пароль хранится как salted scrypt, проверка не зависит от plaintext
+ok 15 - Пароль хранится как salted scrypt, проверка не зависит от plaintext
+  ---
+  duration_ms: 207.563677
+  ...
+# Subtest: HTTP: регистрация, cookie-сессия, CSRF и запрет административных маршрутов
+ok 16 - HTTP: регистрация, cookie-сессия, CSRF и запрет административных маршрутов # SKIP
+  ---
+  duration_ms: 1.217909
+  ...
+# Subtest: SQLite: транзакционные сценарии и разграничение доступа
+ok 17 - SQLite: транзакционные сценарии и разграничение доступа # SKIP
+  ---
+  duration_ms: 1.074219
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 15
+# fail 0
+# cancelled 0
+# skipped 2
+# todo 0
+# duration_ms 365.072961
+
+JavaScript syntax checks:
+public/app.js: PASS
+server/index.js: PASS
+server/create-admin.js: PASS
+server/service.js: PASS
+server/security.js: PASS
+server/api.js: PASS
+server/passwords.js: PASS
+server/db.js: PASS
+server/domain.js: PASS
+tests/http.test.js: PASS
+tests/service.test.js: PASS
+tests/domain.test.js: PASS
+
+Schema checks (Python SQLite):
+duplicate active loan: True
+foreign-key history: True
+negative pages: True
+invalid status: True
