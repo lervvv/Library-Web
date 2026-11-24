@@ -2,6 +2,19 @@ import { all,get,run,tx,audit,publicUser } from './db.js';
 import { hashPassword,verifyPassword,createSession,cookie,rateLimit } from './security.js';
 import { AppError,check,str,int,oneOf,validateReader,policies } from './domain.js';
 import * as service from './service.js';
+function validatePersonExtra(kind,extra){
+ if(kind!=='authors')return;
+ check(extra&&typeof extra==='object'&&!Array.isArray(extra),'Неверные данные автора');
+ const today=new Date().toISOString().slice(0,10);
+ for(const key of ['birth_date','death_date']){
+  const value=extra[key];if(value===undefined||value===null||value==='')continue;
+  check(typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&value.slice(0,4)!=='0000','Введите дату в формате ГГГГ-ММ-ДД');
+  const d=new Date(value+'T00:00:00Z');check(Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===value,'Указана несуществующая дата');
+  check(value<=today,'Дата рождения или смерти не может быть в будущем');
+ }
+ check(!extra.birth_date||!extra.death_date||extra.death_date>=extra.birth_date,'Дата смерти не может быть раньше даты рождения');
+}
+
 export async function api(req,res,url,body,s) {
  const path=url.pathname, method=req.method, u=s?.user;
  const send=(value,status=200)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(value));};
@@ -37,6 +50,7 @@ export async function api(req,res,url,body,s) {
  if(path==='/api/refs' && method==='POST') {
   service.requireStaff(u);const kind=oneOf(body.kind,service.kinds,'Справочник'),name=str(body.name,'Название',150);
   check(body.extra===undefined || (body.extra && typeof body.extra==='object' && !Array.isArray(body.extra)),'Неверные дополнительные поля');
+  validatePersonExtra(kind,body.extra??{});
   const extra=JSON.stringify(body.extra??{});check(extra.length<=2000,'Слишком большие дополнительные поля');
   return send(tx(()=>{const id=Number(run('INSERT INTO refs(kind,name,extra) VALUES(?,?,?)',kind,name,extra).lastInsertRowid);audit(u.id,'create','ref',id);return service.find('refs',id);}),201);
  }
@@ -46,7 +60,7 @@ export async function api(req,res,url,body,s) {
   check(old.kind!=='author_roles','Системные роли авторов нельзя менять или удалять');
   return send(tx(()=>{
    if(method==='DELETE') run('DELETE FROM refs WHERE id=?',old.id);
-   else {const name=str(body.name,'Название',150);const extra=JSON.stringify(body.extra??{});check(extra.length<=2000,'Слишком большие поля');run('UPDATE refs SET name=?,extra=? WHERE id=?',name,extra,old.id);}
+   else {validatePersonExtra(old.kind,body.extra??{});const name=str(body.name,'Название',150);const extra=JSON.stringify(body.extra??{});check(extra.length<=2000,'Слишком большие поля');run('UPDATE refs SET name=?,extra=? WHERE id=?',name,extra,old.id);}
    audit(u.id,method.toLowerCase(),'ref',old.id);return {ok:true};
   }));
  }
@@ -54,7 +68,7 @@ export async function api(req,res,url,body,s) {
   const q=(url.searchParams.get('q')||'').toLocaleLowerCase('ru');
   let rows=all('SELECT * FROM books').map(service.bookDetails);
   const author=(url.searchParams.get('author')||'').toLocaleLowerCase('ru');
-  rows=rows.filter(b=> (!q || [b.title,b.annotation,b.isbn,...b.refs.map(r=>r.name)].some(v=>v.toLocaleLowerCase('ru').includes(q))) && (!author || b.refs.some(r=>r.kind==='authors'&&r.name.toLocaleLowerCase('ru').includes(author))) && (!url.searchParams.get('genre') || b.refs.some(r=>r.id===Number(url.searchParams.get('genre')))) && (!url.searchParams.get('tag') || b.refs.some(r=>r.id===Number(url.searchParams.get('tag')))) && (url.searchParams.get('available')!=='true'||b.available>0));
+  rows=rows.filter(b=> (!q || [b.title,b.isbn].some(v=>String(v??'').toLocaleLowerCase('ru').includes(q))) && (!author || b.refs.some(r=>r.kind==='authors'&&r.name.toLocaleLowerCase('ru').includes(author))) && (!url.searchParams.get('publisher') || b.publisher_id===Number(url.searchParams.get('publisher'))) && [['genre','genres'],['tag','tags'],['category','categories'],['language','languages']].every(([key,kind])=>!url.searchParams.get(key)||b.refs.some(r=>r.kind===kind&&r.id===Number(url.searchParams.get(key)))) && (url.searchParams.get('available')!=='true'||b.available>0));
   const sort=oneOf(url.searchParams.get('sort')||'title',['title','available','id'],'Сортировка');
   rows.sort((a,b)=>sort==='title'?a.title.localeCompare(b.title,'ru'):b[sort]-a[sort]);
   const page=Math.max(1,Number(url.searchParams.get('page'))||1), size=24;
