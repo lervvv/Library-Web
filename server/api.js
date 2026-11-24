@@ -49,6 +49,7 @@ export async function api(req,res,url,body,s) {
  if(path==='/api/refs' && method==='GET') return send(all('SELECT * FROM refs ORDER BY name').map(r=>({...r,extra:JSON.parse(r.extra)})));
  if(path==='/api/refs' && method==='POST') {
   service.requireStaff(u);const kind=oneOf(body.kind,service.kinds,'Справочник'),name=str(body.name,'Название',150);
+  check(kind!=='author_roles','Системные роли авторов нельзя добавлять',403);
   check(body.extra===undefined || (body.extra && typeof body.extra==='object' && !Array.isArray(body.extra)),'Неверные дополнительные поля');
   validatePersonExtra(kind,body.extra??{});
   const extra=JSON.stringify(body.extra??{});check(extra.length<=2000,'Слишком большие дополнительные поля');
@@ -59,7 +60,7 @@ export async function api(req,res,url,body,s) {
   service.requireStaff(u); const old=service.find('refs',m[1]);
   check(old.kind!=='author_roles','Системные роли авторов нельзя менять или удалять');
   return send(tx(()=>{
-   if(method==='DELETE') run('DELETE FROM refs WHERE id=?',old.id);
+   if(method==='DELETE') {service.requireAdmin(u);run('DELETE FROM refs WHERE id=?',old.id);}
    else {validatePersonExtra(old.kind,body.extra??{});const name=str(body.name,'Название',150);const extra=JSON.stringify(body.extra??{});check(extra.length<=2000,'Слишком большие поля');run('UPDATE refs SET name=?,extra=? WHERE id=?',name,extra,old.id);}
    audit(u.id,method.toLowerCase(),'ref',old.id);return {ok:true};
   }));
@@ -92,9 +93,9 @@ export async function api(req,res,url,body,s) {
  if(path==='/api/users'&&method==='GET') {service.requireStaff(u);return send(all('SELECT * FROM users ORDER BY surname,name').map(publicUser));}
  if(path==='/api/users'&&method==='POST') {
   service.requireStaff(u);const r=validateReader(body);const role=oneOf(body.role||'reader',['reader','librarian','admin'],'Роль');if(role!=='reader')service.requireAdmin(u);
-  const category=oneOf(body.category||'Adult',Object.keys(policies),'Категория'),password=body.password?await hashPassword(body.password):null;
+  const category=role==='reader'?oneOf(body.category||'Adult',Object.keys(policies),'Категория'):'Adult',active=int(body.active??1,'Активность',0,1),password=body.password?await hashPassword(body.password):null;
   check(role==='reader'||password,'Для сотрудника нужен пароль');
-  return send(tx(()=>{const id=Number(run('INSERT INTO users(email,password,name,surname,patronymic,birth_date,phone,address,category,role) VALUES(?,?,?,?,?,?,?,?,?,?)',r.email,password,r.name,r.surname,r.patronymic,r.birth_date,r.phone,r.address,category,role).lastInsertRowid);audit(u.id,'create','user',id);return publicUser(service.find('users',id));}),201);
+  return send(tx(()=>{const id=Number(run('INSERT INTO users(email,password,name,surname,patronymic,birth_date,phone,address,category,role,active) VALUES(?,?,?,?,?,?,?,?,?,?,?)',r.email,password,r.name,r.surname,r.patronymic,r.birth_date,r.phone,r.address,category,role,active).lastInsertRowid);audit(u.id,'create','user',id);return publicUser(service.find('users',id));}),201);
  }
  m=path.match(/^\/api\/users\/(\d+)$/);
  if(m&&method==='PUT') {
@@ -102,7 +103,7 @@ export async function api(req,res,url,body,s) {
   if(old.role!=='reader') service.requireAdmin(u);
   const r=validateReader(body),role=oneOf(body.role??old.role,['reader','librarian','admin'],'Роль');
   if(role!==old.role) service.requireAdmin(u);
-  const active=int(body.active,'Активность',0,1),category=oneOf(body.category,Object.keys(policies),'Категория');
+  const active=int(body.active,'Активность',0,1),category=role==='reader'?oneOf(body.category??old.category,Object.keys(policies),'Категория'):'Adult';
   check(!(old.id===u.id&&(role!==old.role||!active)),'Нельзя понизить или заблокировать самого себя');
   const password=body.password?await hashPassword(body.password):old.password;
   check(role==='reader'||password,'У сотрудника должен быть пароль');
@@ -130,7 +131,7 @@ export async function api(req,res,url,body,s) {
  if(path==='/api/notifications/read'&&method==='POST') {run('UPDATE notifications SET read_at=CURRENT_TIMESTAMP WHERE user_id=? AND read_at IS NULL',u.id);return send({ok:true});}
  if(path==='/api/audit'&&method==='GET') {service.requireAdmin(u);return send(all("SELECT a.*,coalesce(u.email,'system') AS actor FROM audit a LEFT JOIN users u ON u.id=a.actor_id ORDER BY a.id DESC LIMIT 1000"));}
  if(path==='/api/stats'&&method==='GET') {
-  service.requireStaff(u);return send({books:get('SELECT count(*) n FROM books').n,readers:get("SELECT count(*) n FROM users WHERE role='reader'").n,copies:all('SELECT status,count(*) n FROM copies GROUP BY status'),loans:get('SELECT count(*) n FROM loans WHERE returned_at IS NULL').n,overdue:get("SELECT count(*) n FROM loans WHERE returned_at IS NULL AND due_at<date('now')").n,popular:all('SELECT b.title,count(l.id) n FROM books b LEFT JOIN copies c ON c.book_id=b.id LEFT JOIN loans l ON l.copy_id=c.id GROUP BY b.id ORDER BY n DESC LIMIT 10')});
+  service.requireStaff(u);return send({books:get('SELECT count(*) n FROM books').n,readers:get("SELECT count(*) n FROM users WHERE role='reader'").n,copies:all('SELECT status,count(*) n FROM copies GROUP BY status'),available_copies:get("SELECT count(*) n FROM copies WHERE status='Available' AND condition!='Bad'").n,loans:get('SELECT count(*) n FROM loans WHERE returned_at IS NULL').n,overdue:get("SELECT count(*) n FROM loans WHERE returned_at IS NULL AND due_at<date('now')").n,popular:all('SELECT b.title,count(l.id) n FROM books b LEFT JOIN copies c ON c.book_id=b.id LEFT JOIN loans l ON l.copy_id=c.id GROUP BY b.id ORDER BY n DESC LIMIT 10')});
  }
  if(path==='/api/integrations/books'&&method==='GET') {
   service.requireStaff(u);rateLimit(`external:${u.id}`,60);const q=str(url.searchParams.get('q'),'Поиск',150);
