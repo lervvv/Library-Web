@@ -39,7 +39,7 @@ export function validateReader(b) {
   return { email, name:str(b.name,'Имя',45), surname:str(b.surname,'Фамилия',45), patronymic:str(b.patronymic ?? '','Отчество',45,false), birth_date, phone, address:str(b.address ?? '','Адрес',200,false) };
 }
 export function validateEligibility(reader, book, count) {
-  check(reader && reader.active === 1 && reader.role === 'reader','Читатель не найден или заблокирован');
+  check(reader && reader.active === 1,'Получатель не найден или заблокирован');
   check(age(reader.birth_date) >= book.age_limit,'Возраст читателя ниже ограничения книги');
-  check(count < policies[reader.category].limit,'Достигнут лимит одновременных выдач');
+  check(count < policies[reader.role==='reader'?reader.category:'Adult'].limit,'Достигнут лимит одновременных выдач');
 }

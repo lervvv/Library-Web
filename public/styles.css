@@ -20,3 +20,5 @@ label[hidden]{display:none!important}
 @media(max-width:760px){header > .actions{gap:12px}#header-actions{gap:10px}#header-actions button{font-size:13px;padding:8px 11px}.catalog-filters>input,.catalog-filters>select{flex-basis:100%;width:100%}}
 
 .section-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px}.section-tabs button[aria-pressed=true]{background:var(--accent);color:white;border-color:var(--accent)}
+
+header{position:sticky;top:0;z-index:5}main:has(.profile-view){margin-block:0}.profile-view .toolbar{margin-bottom:12px}@media(max-width:760px){nav{position:static}}

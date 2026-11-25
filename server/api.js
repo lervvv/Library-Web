@@ -48,8 +48,8 @@ export async function api(req,res,url,body,s) {
  }
  if(path==='/api/refs' && method==='GET') return send(all('SELECT * FROM refs ORDER BY name').map(r=>({...r,extra:JSON.parse(r.extra)})));
  if(path==='/api/refs' && method==='POST') {
-  service.requireStaff(u);const kind=oneOf(body.kind,service.kinds,'Справочник'),name=str(body.name,'Название',150);
-  check(kind!=='author_roles','Системные роли авторов нельзя добавлять',403);
+  service.requireStaff(u);const kind=oneOf(body.kind,service.kinds,'Справочник'),name=str(body.name,'Название',kind==='author_roles'?45:150);
+  if(kind==='author_roles') service.requireAdmin(u);
   check(body.extra===undefined || (body.extra && typeof body.extra==='object' && !Array.isArray(body.extra)),'Неверные дополнительные поля');
   validatePersonExtra(kind,body.extra??{});
   const extra=JSON.stringify(body.extra??{});check(extra.length<=2000,'Слишком большие дополнительные поля');
@@ -58,7 +58,22 @@ export async function api(req,res,url,body,s) {
  let m=path.match(/^\/api\/refs\/(\d+)$/);
  if(m && ['PUT','DELETE'].includes(method)) {
   service.requireStaff(u); const old=service.find('refs',m[1]);
-  check(old.kind!=='author_roles','Системные роли авторов нельзя менять или удалять');
+  if(old.kind==='author_roles') {
+   service.requireAdmin(u);
+   return send(tx(()=>{
+    if(method==='DELETE'){
+     check(!get('SELECT 1 FROM book_refs WHERE role=? UNION ALL SELECT 1 FROM document_refs WHERE role=? LIMIT 1',old.name,old.name),'Эта роль используется в книгах или произведениях',409);
+     check(get("SELECT count(*) n FROM refs WHERE kind='author_roles'").n>1,'Нельзя удалить последнюю роль',409);
+     run('DELETE FROM refs WHERE id=?',old.id);
+    }else{
+     const name=str(body.name,'Роль автора',45);
+     run('UPDATE refs SET name=? WHERE id=?',name,old.id);
+     run('UPDATE book_refs SET role=? WHERE role=?',name,old.name);
+     run('UPDATE document_refs SET role=? WHERE role=?',name,old.name);
+    }
+    audit(u.id,method.toLowerCase(),'ref',old.id);return {ok:true};
+   }));
+  }
   return send(tx(()=>{
    if(method==='DELETE') {service.requireAdmin(u);run('DELETE FROM refs WHERE id=?',old.id);}
    else {validatePersonExtra(old.kind,body.extra??{});const name=str(body.name,'Название',150);const extra=JSON.stringify(body.extra??{});check(extra.length<=2000,'Слишком большие поля');run('UPDATE refs SET name=?,extra=? WHERE id=?',name,extra,old.id);}

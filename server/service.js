@@ -19,7 +19,7 @@ function links(b) {
  check(Array.isArray(b.refs??[]) && (b.refs??[]).length<=100,'Неверные связи');
  return (b.refs??[]).map(x=>{
   const r=find('refs',x.id); check(['authors','genres','categories','languages','tags'].includes(r.kind),'Недопустимый справочник');
-  const role=r.kind==='authors'?str(x.role||'Author','Роль автора',45):'';
+  const role=r.kind==='authors'?str(x.role||(get("SELECT name FROM refs WHERE kind='author_roles' ORDER BY (name='Author') DESC,id LIMIT 1")?.name||'Author'),'Роль автора',45):'';
   if(r.kind==='authors') check(get("SELECT id FROM refs WHERE kind='author_roles' AND name=?",role),'Роль автора отсутствует');
   return {id:r.id,role};
  });
@@ -60,7 +60,7 @@ export function issue(u,b) {
   validateEligibility(reader,book,counts(reader.id)); check(copy.condition!=='Bad','Повреждённый экземпляр нельзя выдать');
   const reservation=get("SELECT * FROM reservations WHERE copy_id=? AND status='active'",copy.id);
   check(copy.status==='Available' || (copy.status==='Reserved' && reservation?.reader_id===reader.id),'Экземпляр недоступен');
-  const days=int(b.days??policies[reader.category].days,'Срок выдачи',1,90);
+  const days=int(b.days??policies[reader.role==='reader'?reader.category:'Adult'].days,'Срок выдачи',1,90);
   const id=Number(run('INSERT INTO loans(copy_id,reader_id,issued_at,due_at) VALUES(?,?,?,?)',copy.id,reader.id,today(),addDays(today(),days)).lastInsertRowid);
   run("UPDATE copies SET status='Issued' WHERE id=?",copy.id);
   if(reservation) run("UPDATE reservations SET status='fulfilled' WHERE id=?",reservation.id);
@@ -104,7 +104,7 @@ export function renew(u,id) {
   const loan=find('loans',id); check(u.role!=='reader'||loan.reader_id===u.id,'Нет доступа',403);
   check(!loan.returned_at && overdue(loan.due_at)===0 && loan.renewals<1,'Продление недоступно: просрочка, возврат или лимит продлений');
   const reader=find('users',loan.reader_id); check(reader.active,'Читатель заблокирован');
-  const due=addDays(loan.due_at,policies[reader.category].days);
+  const due=addDays(loan.due_at,policies[reader.role==='reader'?reader.category:'Adult'].days);
   run('UPDATE loans SET due_at=?,renewals=renewals+1 WHERE id=?',due,loan.id); audit(u.id,'renew','loan',loan.id); notify(reader.id,`Срок возврата продлён до ${due}`); return find('loans',loan.id);
  });
 }
